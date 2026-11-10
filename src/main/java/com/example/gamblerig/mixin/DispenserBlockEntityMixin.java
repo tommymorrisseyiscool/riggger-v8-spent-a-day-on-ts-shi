@@ -34,7 +34,7 @@ public abstract class DispenserBlockEntityMixin {
         if (now - st.pendingTick > 20 || !st.pending.containsKey(key)) {
             Rigger.Plan plan = Rigger.plan(sw, p, random, st.winLeft);
             if (plan == null) {
-                p.sendMessage(Text.literal("[Rig] Need 2 dispensers with items within " + Rigger.RADIUS + " blocks"), true);
+                p.sendMessage(Text.literal("[Rig] Need 2 dispensers/droppers with items within " + Rigger.RADIUS + " blocks"), true);
                 return;
             }
             st.pending.clear();
@@ -44,6 +44,8 @@ public abstract class DispenserBlockEntityMixin {
             int l = st.winLeft ? plan.winNum() : plan.loseNum();
             int r = st.winLeft ? plan.loseNum() : plan.winNum();
             st.last = "L=" + l + " R=" + r;
+            GambleRig.LOGGER.info("[GambleRig] rigged for {}: {} wins L={} R={}", p.getName().getString(),
+                st.winLeft ? "LEFT" : "RIGHT", l, r);
             p.sendMessage(Text.literal("[Rig] " + (st.winLeft ? "LEFT" : "RIGHT") + " wins:  L=" + l + "  R=" + r), true);
         }
 

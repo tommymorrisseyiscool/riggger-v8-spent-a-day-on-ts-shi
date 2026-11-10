@@ -29,7 +29,8 @@ public final class Rigger {
         BlockPos c = p.getBlockPos();
         List<BlockPos> found = new ArrayList<>();
         for (BlockPos pos : BlockPos.iterate(c.add(-RADIUS, -HEIGHT, -RADIUS), c.add(RADIUS, HEIGHT, RADIUS))) {
-            if (w.getBlockState(pos).isOf(Blocks.DISPENSER) && w.getBlockEntity(pos) instanceof DispenserBlockEntity) {
+            if ((w.getBlockState(pos).isOf(Blocks.DISPENSER) || w.getBlockState(pos).isOf(Blocks.DROPPER))
+                && w.getBlockEntity(pos) instanceof DispenserBlockEntity) {
                 found.add(pos.toImmutable());
             }
         }
