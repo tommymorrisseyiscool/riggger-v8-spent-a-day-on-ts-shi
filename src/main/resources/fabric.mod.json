@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "gamblerig",
+  "version": "${version}",
+  "name": "Gamble Rig",
+  "description": "Allowlisted dispenser outcome control for your own server.",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.example.gamblerig.GambleRig"],
+    "client": ["com.example.gamblerig.client.GambleRigClient"]
+  },
+  "mixins": ["gamblerig.mixins.json"],
+  "depends": { "fabricloader": ">=0.18.0", "minecraft": "~1.21.11", "java": ">=21", "fabric-api": "*" }
+}
