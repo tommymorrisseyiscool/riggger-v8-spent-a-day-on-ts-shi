@@ -70,7 +70,7 @@ public class GambleRigClient implements ClientModInitializer {
             ClientState.enabled ? "RIG: ENABLED" : "RIG: DISABLED",
             "L: " + ClientState.left,
             "R: " + ClientState.right,
-            "Last: " + ClientState.last };
+            "Win: " + ClientState.last };
         int[] colors = { ClientState.enabled ? 0xFF55FF55 : 0xFFFF5555, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFF55 };
         int y = 6;
         for (int i = 0; i < lines.length; i++) {

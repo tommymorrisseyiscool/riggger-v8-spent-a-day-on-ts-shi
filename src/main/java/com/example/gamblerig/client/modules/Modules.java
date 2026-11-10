@@ -4,7 +4,6 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.option.ParticlesMode;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.mob.HostileEntity;
@@ -120,23 +119,19 @@ public final class Modules {
     static class FpsBoost extends Module {
         private int view, sim;
         private double entityScale;
-        private ParticlesMode particles;
         FpsBoost() { super("FPS Boost", false); }
         @Override public void onEnable(MinecraftClient mc) {
             view = mc.options.getViewDistance().getValue();
             sim = mc.options.getSimulationDistance().getValue();
             entityScale = mc.options.getEntityDistanceScaling().getValue();
-            particles = mc.options.getParticles().getValue();
             mc.options.getViewDistance().setValue(Math.min(view, 8));
             mc.options.getSimulationDistance().setValue(Math.min(sim, 8));
             mc.options.getEntityDistanceScaling().setValue(0.5);
-            mc.options.getParticles().setValue(ParticlesMode.MINIMAL);
         }
         @Override public void onDisable(MinecraftClient mc) {
             mc.options.getViewDistance().setValue(view);
             mc.options.getSimulationDistance().setValue(sim);
             mc.options.getEntityDistanceScaling().setValue(entityScale);
-            mc.options.getParticles().setValue(particles);
         }
         @Override public void tick(MinecraftClient mc) {}
     }

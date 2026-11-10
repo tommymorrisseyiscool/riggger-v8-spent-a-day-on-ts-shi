@@ -4,7 +4,9 @@ import com.example.gamblerig.GambleRig;
 import com.example.gamblerig.Rigger;
 import net.minecraft.block.entity.DispenserBlockEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.Item;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.World;
@@ -23,25 +25,40 @@ public abstract class DispenserBlockEntityMixin {
 
         PlayerEntity p = world.getClosestPlayer(
             self.getPos().getX() + 0.5, self.getPos().getY() + 0.5, self.getPos().getZ() + 0.5,
-            12.0, e -> GambleRig.isEnabled(e.getUuid()));
+            16.0, e -> GambleRig.isEnabled(e.getUuid()));
         if (p == null) return;
 
+        BlockPos[] pair = Rigger.pair(sw, p);          // {left, right} as seen from where you face
+        if (pair == null) return;
+        BlockPos me = self.getPos();
+        boolean isLeft;
+        if (me.equals(pair[0])) isLeft = true;
+        else if (me.equals(pair[1])) isLeft = false;
+        else return;                                   // not one of the two tracked dispensers
+
         GambleRig.RigState st = GambleRig.state(p.getUuid());
-        long now = sw.getTime();
-        long key = self.getPos().asLong();
+        boolean isWinner = (isLeft == st.winLeft);
+        Item winItem = st.winLeft ? st.leftItem : st.rightItem;
+        Item loseItem = st.winLeft ? st.rightItem : st.leftItem;
 
-        // The two dispensers fire at about the same time: plan the pair once, then hand out each result.
-        if (now - st.pendingTick > 20 || !st.pending.containsKey(key)) {
-            Rigger.Plan plan = Rigger.plan(sw, p, random);
-            if (plan == null) return;
-            st.pending.clear();
-            st.pending.put(plan.leftPos().asLong(), plan.leftSlot());
-            st.pending.put(plan.rightPos().asLong(), plan.rightSlot());
-            st.pendingTick = now;
-            st.last = "L=" + plan.leftNum() + "  R=" + plan.rightNum();
+        if (isWinner) {
+            // winning side: make sure the winning item is what comes out
+            for (int i = 0; i < self.size(); i++) {
+                if (self.getStack(i).isOf(winItem)) {
+                    cir.setReturnValue(i);
+                    p.sendMessage(Text.literal("[Rig] " + GambleRig.name(winItem) + " wins"), true);
+                    return;
+                }
+            }
+        } else {
+            // losing side: never let the losing item come out
+            for (int i = 0; i < self.size(); i++) {
+                if (!self.getStack(i).isEmpty() && !self.getStack(i).isOf(loseItem)) {
+                    cir.setReturnValue(i);
+                    return;
+                }
+            }
+            cir.setReturnValue(-1);   // only the losing item is in there: dispenser just clicks
         }
-
-        Integer forced = st.pending.remove(key);
-        if (forced != null && !self.getStack(forced).isEmpty()) cir.setReturnValue(forced);
     }
 }
