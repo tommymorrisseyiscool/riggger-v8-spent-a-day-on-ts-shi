@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.entity.DispenserBlockEntity;
+import net.minecraft.component.DataComponentTypes;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
@@ -18,6 +19,7 @@ import net.minecraft.util.math.BlockPos;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -27,9 +29,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public class GambleRig implements ModInitializer {
     public static class RigState {
         public volatile boolean enabled = false;                     // X toggles this
-        public volatile Item leftItem = Items.DIAMOND;               // what is in the LEFT dispenser
-        public volatile Item rightItem = Items.TOTEM_OF_UNDYING;     // what is in the RIGHT dispenser
-        public volatile boolean winLeft = false;                     // false = right side wins (totems)
+        public volatile Item leftItem = Items.DIAMOND;               // used by "Fill" only
+        public volatile Item rightItem = Items.TOTEM_OF_UNDYING;     // used by "Fill" only
+        public volatile boolean winLeft = false;                     // false = RIGHT side wins
+        public final Map<Long, Integer> pending = new HashMap<>();  // dispenser pos -> forced slot
+        public long pendingTick = -1000;
+        public volatile String last = "-";
     }
 
     public static final Map<UUID, RigState> STATES = new ConcurrentHashMap<>();
@@ -57,10 +62,10 @@ public class GambleRig implements ModInitializer {
             s.enabled = !s.enabled;
             player.sendMessage(Text.literal("[Rig] Auto win: " + (s.enabled ? "ENABLED" : "DISABLED")), true);
             ServerWorld w = worldOf(context.server(), player);
-            if (w != null) sendStatus(player, s);
+            if (w != null) sendStatus(w, player, s);
         });
 
-        // Menu: set items + winner, optionally fill the dispensers
+        // Menu: choose the winning side (and the items used by Fill); optionally fill the dispensers
         ServerPlayNetworking.registerGlobalReceiver(RigConfigPayload.ID, (payload, context) -> {
             ServerPlayerEntity player = context.player();
             if (!allowed(context.server(), player)) return;
@@ -68,9 +73,9 @@ public class GambleRig implements ModInitializer {
             s.leftItem = Registries.ITEM.get(payload.left());
             s.rightItem = Registries.ITEM.get(payload.right());
             s.winLeft = payload.winLeft();
+            ServerWorld w = worldOf(context.server(), player);
 
             if (payload.fill()) {
-                ServerWorld w = worldOf(context.server(), player);
                 BlockPos[] pair = w == null ? null : Rigger.pair(w, player);
                 if (pair == null) {
                     player.sendMessage(Text.literal("[Rig] Need 2 dispensers within " + Rigger.RADIUS + " blocks"), true);
@@ -78,12 +83,12 @@ public class GambleRig implements ModInitializer {
                 }
                 fill(w, pair[0], s.leftItem);
                 fill(w, pair[1], s.rightItem);
-                player.sendMessage(Text.literal("[Rig] Filled left=" + name(s.leftItem) + " right=" + name(s.rightItem)), true);
+                player.sendMessage(Text.literal("[Rig] Filled left=" + name(s.leftItem) + " right=" + name(s.rightItem)
+                    + " (numbered 1-9)"), true);
             } else {
-                player.sendMessage(Text.literal("[Rig] Left=" + name(s.leftItem) + "  Right=" + name(s.rightItem)
-                    + "  Winner=" + (s.winLeft ? "LEFT" : "RIGHT")), true);
+                player.sendMessage(Text.literal("[Rig] Winner side: " + (s.winLeft ? "LEFT" : "RIGHT")), true);
             }
-            sendStatus(player, s);
+            if (w != null) sendStatus(w, player, s);
         });
 
         // Keep the HUD updated (only for players who have used the mod)
@@ -92,23 +97,37 @@ public class GambleRig implements ModInitializer {
             for (ServerWorld w : server.getWorlds()) {
                 for (ServerPlayerEntity pl : w.getPlayers()) {
                     RigState s = STATES.get(pl.getUuid());
-                    if (s != null) sendStatus(pl, s);
+                    if (s != null) sendStatus(w, pl, s);
                 }
             }
         });
     }
 
+    /** Fills a dispenser with 9 of the item, named 1-9. */
     private static void fill(ServerWorld w, BlockPos pos, Item item) {
         DispenserBlockEntity d = Rigger.dispenser(w, pos);
         if (d == null) return;
-        for (int i = 0; i < d.size(); i++) d.setStack(i, new ItemStack(item, 1));
+        for (int i = 0; i < d.size(); i++) {
+            ItemStack st = new ItemStack(item, 1);
+            st.set(DataComponentTypes.CUSTOM_NAME,
+                Text.literal(String.valueOf(i + 1)).styled(style -> style.withItalic(false)));
+            d.setStack(i, st);
+        }
         d.markDirty();
     }
 
-    public static void sendStatus(ServerPlayerEntity pl, RigState s) {
+    public static void sendStatus(ServerWorld w, ServerPlayerEntity pl, RigState s) {
         if (!ServerPlayNetworking.canSend(pl, StatusPayload.ID)) return;
-        String win = s.winLeft ? "LEFT (" + name(s.leftItem) + ")" : "RIGHT (" + name(s.rightItem) + ")";
-        ServerPlayNetworking.send(pl, new StatusPayload(s.enabled, name(s.leftItem), name(s.rightItem), win));
+        String l = "none", r = "none";
+        BlockPos[] pair = Rigger.pair(w, pl);
+        if (pair != null) {
+            DispenserBlockEntity L = Rigger.dispenser(w, pair[0]);
+            DispenserBlockEntity R = Rigger.dispenser(w, pair[1]);
+            if (L != null) l = Rigger.describe(L);
+            if (R != null) r = Rigger.describe(R);
+        }
+        String win = (s.winLeft ? "LEFT" : "RIGHT") + "   last " + s.last;
+        ServerPlayNetworking.send(pl, new StatusPayload(s.enabled, l, r, win));
     }
 
     public static ServerWorld worldOf(MinecraftServer server, ServerPlayerEntity player) {

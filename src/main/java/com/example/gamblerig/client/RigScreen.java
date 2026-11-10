@@ -46,7 +46,7 @@ public class RigScreen extends Screen {
         addDrawableChild(ButtonWidget.builder(Text.literal("Apply"), b -> send(false))
             .dimensions(cx, y + 76, 200, 20).build());
 
-        addDrawableChild(ButtonWidget.builder(Text.literal("Fill the 2 nearest dispensers with these items"), b -> send(true))
+        addDrawableChild(ButtonWidget.builder(Text.literal("Fill 2 nearest dispensers (numbered 1-9)"), b -> send(true))
             .dimensions(cx, y + 100, 200, 20).build());
 
         addDrawableChild(ButtonWidget.builder(toggleLabel(), b -> {
