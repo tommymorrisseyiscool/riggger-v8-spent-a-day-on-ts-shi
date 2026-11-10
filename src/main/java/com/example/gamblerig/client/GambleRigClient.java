@@ -2,7 +2,6 @@ package com.example.gamblerig.client;
 
 import com.example.gamblerig.StatusPayload;
 import com.example.gamblerig.TogglePayload;
-import com.example.gamblerig.client.modules.Modules;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -29,10 +28,7 @@ public class GambleRigClient implements ClientModInitializer {
             "key.gamblerig.toggle", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_X, category));
         KeyBinding hud = KeyBindingHelper.registerKeyBinding(new KeyBinding(
             "key.gamblerig.hud", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_R, category));
-        KeyBinding modulesKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-            "key.gamblerig.modules", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, category));
 
-        Modules.init();
 
         ClientPlayNetworking.registerGlobalReceiver(StatusPayload.ID, (payload, context) -> {
             ClientState.enabled = payload.enabled();
@@ -43,7 +39,6 @@ public class GambleRigClient implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (menu.wasPressed()) client.setScreen(new RigScreen());
-            while (modulesKey.wasPressed()) client.setScreen(new ModulesScreen());
             while (hud.wasPressed()) ClientState.hudVisible = !ClientState.hudVisible;   // R: hide / unhide
             while (toggle.wasPressed() && client.player != null) {
                 ClientState.enabled = !ClientState.enabled;           // instant feedback; server confirms

@@ -6,11 +6,6 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.entity.DispenserBlockEntity;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -29,8 +24,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class GambleRig implements ModInitializer {
     public static class RigState {
         public volatile boolean enabled = false;                     // X toggles this
-        public volatile Item leftItem = Items.DIAMOND;               // used by "Fill" only
-        public volatile Item rightItem = Items.TOTEM_OF_UNDYING;     // used by "Fill" only
         public volatile boolean winLeft = false;                     // false = RIGHT side wins
         public final Map<Long, Integer> pending = new HashMap<>();  // dispenser pos -> forced slot
         public long pendingTick = -1000;
@@ -45,8 +38,6 @@ public class GambleRig implements ModInitializer {
         RigState s = STATES.get(id);
         return s != null && s.enabled;
     }
-
-    public static String name(Item item) { return Registries.ITEM.getId(item).getPath(); }
 
     @Override
     public void onInitialize() {
@@ -65,29 +56,14 @@ public class GambleRig implements ModInitializer {
             if (w != null) sendStatus(w, player, s);
         });
 
-        // Menu: choose the winning side (and the items used by Fill); optionally fill the dispensers
+        // Menu: choose the winning side
         ServerPlayNetworking.registerGlobalReceiver(RigConfigPayload.ID, (payload, context) -> {
             ServerPlayerEntity player = context.player();
             if (!allowed(context.server(), player)) return;
             RigState s = state(player.getUuid());
-            s.leftItem = Registries.ITEM.get(payload.left());
-            s.rightItem = Registries.ITEM.get(payload.right());
             s.winLeft = payload.winLeft();
+            player.sendMessage(Text.literal("[Rig] Winning side: " + (s.winLeft ? "LEFT" : "RIGHT")), true);
             ServerWorld w = worldOf(context.server(), player);
-
-            if (payload.fill()) {
-                BlockPos[] pair = w == null ? null : Rigger.pair(w, player);
-                if (pair == null) {
-                    player.sendMessage(Text.literal("[Rig] Need 2 dispensers within " + Rigger.RADIUS + " blocks"), true);
-                    return;
-                }
-                fill(w, pair[0], s.leftItem);
-                fill(w, pair[1], s.rightItem);
-                player.sendMessage(Text.literal("[Rig] Filled left=" + name(s.leftItem) + " right=" + name(s.rightItem)
-                    + " (numbered 1-9)"), true);
-            } else {
-                player.sendMessage(Text.literal("[Rig] Winner side: " + (s.winLeft ? "LEFT" : "RIGHT")), true);
-            }
             if (w != null) sendStatus(w, player, s);
         });
 
@@ -101,19 +77,6 @@ public class GambleRig implements ModInitializer {
                 }
             }
         });
-    }
-
-    /** Fills a dispenser with 9 of the item, named 1-9. */
-    private static void fill(ServerWorld w, BlockPos pos, Item item) {
-        DispenserBlockEntity d = Rigger.dispenser(w, pos);
-        if (d == null) return;
-        for (int i = 0; i < d.size(); i++) {
-            ItemStack st = new ItemStack(item, 1);
-            st.set(DataComponentTypes.CUSTOM_NAME,
-                Text.literal(String.valueOf(i + 1)).styled(style -> style.withItalic(false)));
-            d.setStack(i, st);
-        }
-        d.markDirty();
     }
 
     public static void sendStatus(ServerWorld w, ServerPlayerEntity pl, RigState s) {
